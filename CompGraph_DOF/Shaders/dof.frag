@@ -14,6 +14,7 @@ uniform float uFarBlurScale;
 uniform float uMaxBlurRadius;
 uniform float uSigma;
 uniform float uDepthSigma;
+uniform int uDebugView;
 uniform float uNearPlane;
 uniform float uFarPlane;
 
@@ -44,14 +45,38 @@ void main()
     float centerLinearDepth = LinearizeDepth(centerDepth, uNearPlane, uFarPlane);
     float centerBlurMask = FocusBlurMask(centerLinearDepth);
 
+    if (uDebugView == 0)
+    {
+        FragColor = vec4(sharpColor, 1.0);
+        return;
+    }
+
+    if (uDebugView == 1)
+    {
+        float normalizedDepth = clamp(centerLinearDepth / max(uFarPlane, 0.0001), 0.0, 1.0);
+        FragColor = vec4(vec3(normalizedDepth), 1.0);
+        return;
+    }
+
+    if (uDebugView == 2)
+    {
+        FragColor = vec4(vec3(centerBlurMask), 1.0);
+        return;
+    }
+
     const int KERNEL_RADIUS = 4;
     float effectiveRadius = uMaxBlurRadius * centerBlurMask;
+    if (effectiveRadius <= 0.0001)
+    {
+        FragColor = vec4(sharpColor, 1.0);
+        return;
+    }
+
     float sampleScale = effectiveRadius / float(KERNEL_RADIUS);
     float sigma = max(uSigma, 0.0001);
 
     vec3 blurAccum = vec3(0.0);
     float weightAccum = 0.0;
-    const float MinimumBlurContribution = 0.02;
 
     for (int y = -KERNEL_RADIUS; y <= KERNEL_RADIUS; ++y)
     {
@@ -64,11 +89,14 @@ void main()
             vec3 sampleColor = texture(uSceneColorTexture, sampleUv).rgb;
             float sampleDepth = texture(uSceneDepthTexture, sampleUv).r;
             float sampleLinearDepth = LinearizeDepth(sampleDepth, uNearPlane, uFarPlane);
-            float sampleBlurMask = FocusBlurMask(sampleLinearDepth);
 
             float gaussianWeight = Gaussian(kernelOffset.x * sampleScale, kernelOffset.y * sampleScale, sigma);
-            float depthWeight = exp(-abs(sampleLinearDepth - centerLinearDepth) * uDepthSigma);
-            float weight = gaussianWeight * depthWeight * max(sampleBlurMask, MinimumBlurContribution);
+            float depthDelta = sampleLinearDepth - centerLinearDepth;
+            float depthSigma = max(uDepthSigma, 0.0001);
+            float depthWeight = exp(
+                -(depthDelta * depthDelta) /
+                (2.0 * depthSigma * depthSigma));
+            float weight = gaussianWeight * depthWeight;
 
             blurAccum += sampleColor * weight;
             weightAccum += weight;
@@ -76,6 +104,12 @@ void main()
     }
 
     vec3 blurredColor = blurAccum / max(weightAccum, 0.0001);
+    if (uDebugView == 3)
+    {
+        FragColor = vec4(blurredColor, 1.0);
+        return;
+    }
+
     vec3 finalColor = mix(sharpColor, blurredColor, centerBlurMask);
     FragColor = vec4(finalColor, 1.0);
 }

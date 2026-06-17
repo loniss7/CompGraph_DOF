@@ -47,7 +47,8 @@ internal sealed class ShaderProgram : IDisposable
             value.M41, value.M42, value.M43, value.M44
         };
 
-        GL.UniformMatrix4fv(GetUniformLocation(name), 1, 1, data);
+        // CPU matrices are transposed explicitly at the call site.
+        GL.UniformMatrix4fv(GetUniformLocation(name), 1, 0, data);
     }
 
     public void SetVector2(string name, Vector2 value)

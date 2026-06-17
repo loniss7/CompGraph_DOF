@@ -16,13 +16,14 @@ internal sealed class DofRenderer : IDisposable
     private int _height;
 
     public float FocusDistance { get; set; }
-    public float FocusRange { get; set; } = 1.8f;
-    public float FocusTransition { get; set; } = 3.0f;
-    public float NearBlurScale { get; set; } = 0.50f;
-    public float FarBlurScale { get; set; } = 0.80f;
-    public float MaxBlurRadius { get; set; } = 2.7f;
-    public float Sigma { get; set; } = 1.7f;
-    public float DepthSigma { get; set; } = 3.0f;
+    public float FocusRange { get; set; } = 0.8f;
+    public float FocusTransition { get; set; } = 1.5f;
+    public float NearBlurScale { get; set; } = 1.0f;
+    public float FarBlurScale { get; set; } = 1.0f;
+    public float MaxBlurRadius { get; set; } = 8.0f;
+    public float Sigma { get; set; } = 3.0f;
+    public float DepthSigma { get; set; } = 2.0f;
+    public DofDebugView DebugView { get; set; } = DofDebugView.Composite;
 
     private static readonly Vector3 LightDirection = Vector3.Normalize(new Vector3(-0.45f, -1.0f, -0.35f));
     private static readonly float[] ClearColor = { 0.05f, 0.06f, 0.09f, 1f };
@@ -75,13 +76,14 @@ internal sealed class DofRenderer : IDisposable
     public void ResetParameters(float defaultFocusDistance)
     {
         FocusDistance = defaultFocusDistance;
-        FocusRange = 1.8f;
-        FocusTransition = 3.0f;
-        NearBlurScale = 0.50f;
-        FarBlurScale = 0.80f;
-        MaxBlurRadius = 2.7f;
-        Sigma = 1.7f;
-        DepthSigma = 3.0f;
+        FocusRange = 0.8f;
+        FocusTransition = 1.5f;
+        NearBlurScale = 1.0f;
+        FarBlurScale = 1.0f;
+        MaxBlurRadius = 8.0f;
+        Sigma = 3.0f;
+        DepthSigma = 2.0f;
+        DebugView = DofDebugView.Composite;
     }
 
     public void Render(Camera camera, DemoScene scene)
@@ -177,8 +179,9 @@ internal sealed class DofRenderer : IDisposable
         GL.ClearBufferfv(GL.DEPTH, 0, ClearDepth);
 
         _sceneShader.Use();
-        _sceneShader.SetMatrix4("uView", camera.GetViewMatrix());
-        _sceneShader.SetMatrix4("uProjection", camera.GetProjectionMatrix());
+        // Camera matrices are built on the CPU in row-major form and transposed before upload.
+        _sceneShader.SetMatrix4("uView", Matrix4x4.Transpose(camera.GetViewMatrix()));
+        _sceneShader.SetMatrix4("uProjection", Matrix4x4.Transpose(camera.GetProjectionMatrix()));
         _sceneShader.SetVector3("uCameraPosition", camera.Position);
         _sceneShader.SetVector3("uLightDirection", LightDirection);
 
@@ -209,6 +212,7 @@ internal sealed class DofRenderer : IDisposable
         _dofShader.SetFloat("uNearPlane", camera.NearPlane);
         _dofShader.SetFloat("uFarPlane", camera.FarPlane);
         _dofShader.SetVector2("uTexelSize", new Vector2(1f / _width, 1f / _height));
+        _dofShader.SetInt("uDebugView", (int)DebugView);
 
         GL.ActiveTexture(GL.TEXTURE0);
         GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer!.ColorTexture);

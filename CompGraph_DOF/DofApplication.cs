@@ -347,7 +347,8 @@ internal sealed class DofApplication : IDisposable
     {
         string title = string.Format(
             CultureInfo.InvariantCulture,
-            "CompGraph DOF | Focus {0:F2} | Range {1:F2} | Transition {2:F2} | Radius {3:F1} | Sigma {4:F2} | Depth {5:F2} | {6}",
+            "CompGraph DOF | View {0} | Focus {1:F2} | Range {2:F2} | Transition {3:F2} | Radius {4:F1} | Sigma {5:F2} | Depth {6:F2} | {7}",
+            DescribeDebugView(_renderer.DebugView),
             _renderer.FocusDistance,
             _renderer.FocusRange,
             _renderer.FocusTransition,
@@ -510,6 +511,26 @@ internal sealed class DofApplication : IDisposable
             case Win32.VK_R:
                 ResetCameraAndDof();
                 break;
+
+            case Win32.VK_1:
+                _renderer.DebugView = DofDebugView.SceneColor;
+                break;
+
+            case Win32.VK_2:
+                _renderer.DebugView = DofDebugView.Depth;
+                break;
+
+            case Win32.VK_3:
+                _renderer.DebugView = DofDebugView.CircleOfConfusion;
+                break;
+
+            case Win32.VK_4:
+                _renderer.DebugView = DofDebugView.BlurredColor;
+                break;
+
+            case Win32.VK_5:
+                _renderer.DebugView = DofDebugView.Composite;
+                break;
         }
 
         return 0;
@@ -528,4 +549,17 @@ internal sealed class DofApplication : IDisposable
     private static int GetX(nint lParam) => unchecked((short)(lParam.ToInt64() & 0xFFFF));
 
     private static int GetY(nint lParam) => unchecked((short)((lParam.ToInt64() >> 16) & 0xFFFF));
+
+    private static string DescribeDebugView(DofDebugView debugView)
+    {
+        return debugView switch
+        {
+            DofDebugView.SceneColor => "Scene",
+            DofDebugView.Depth => "Depth",
+            DofDebugView.CircleOfConfusion => "CoC",
+            DofDebugView.BlurredColor => "Blur",
+            DofDebugView.Composite => "Composite",
+            _ => "Unknown"
+        };
+    }
 }

@@ -12,6 +12,7 @@ out vec3 vNormal;
 
 void main()
 {
+    // CPU-side matrices are transposed before upload, so GLSL can use standard column-vector math.
     vec4 worldPosition = uModel * vec4(aPosition, 1.0);
     vWorldPosition = worldPosition.xyz;
     vNormal = mat3(transpose(inverse(uModel))) * aNormal;

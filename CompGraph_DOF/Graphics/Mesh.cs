@@ -202,12 +202,12 @@ internal sealed class Mesh : IDisposable
                 uint second = first + (uint)stride;
 
                 indices.Add(first);
-                indices.Add(second);
                 indices.Add(first + 1);
+                indices.Add(second);
 
                 indices.Add(first + 1);
-                indices.Add(second);
                 indices.Add(second + 1);
+                indices.Add(second);
             }
         }
 

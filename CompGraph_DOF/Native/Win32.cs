@@ -47,6 +47,11 @@ internal static class Win32
     public const int VK_RIGHT = 0x27;
     public const int VK_DOWN = 0x28;
     public const int VK_R = 0x52;
+    public const int VK_1 = 0x31;
+    public const int VK_2 = 0x32;
+    public const int VK_3 = 0x33;
+    public const int VK_4 = 0x34;
+    public const int VK_5 = 0x35;
     public const int VK_W = 0x57;
     public const int VK_A = 0x41;
     public const int VK_S = 0x53;

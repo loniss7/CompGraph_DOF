@@ -26,7 +26,8 @@ internal sealed class SceneObject
 
     public void Draw(ShaderProgram shader)
     {
-        shader.SetMatrix4("uModel", Model);
+        // Keep the CPU-side model matrix in row-major form and upload the transposed copy for GLSL.
+        shader.SetMatrix4("uModel", Matrix4x4.Transpose(Model));
         shader.SetVector3("uBaseColor", BaseColor);
         shader.SetFloat("uSpecularStrength", SpecularStrength);
         shader.SetFloat("uShininess", Shininess);
