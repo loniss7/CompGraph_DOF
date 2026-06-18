@@ -47,7 +47,9 @@ internal sealed class ShaderProgram : IDisposable
             value.M41, value.M42, value.M43, value.M44
         };
 
-        // CPU matrices are transposed explicitly at the call site.
+        // System.Numerics stores row-vector matrices in row-major field order.
+        // Passing this data to OpenGL with transpose=false produces the
+        // corresponding column-vector matrix expected by GLSL.
         GL.UniformMatrix4fv(GetUniformLocation(name), 1, 0, data);
     }
 

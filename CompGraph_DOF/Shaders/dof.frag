@@ -43,7 +43,8 @@ void main()
     vec3 sharpColor = texture(uSceneColorTexture, vTexCoord).rgb;
     float centerDepth = texture(uSceneDepthTexture, vTexCoord).r;
     float centerLinearDepth = LinearizeDepth(centerDepth, uNearPlane, uFarPlane);
-    float centerBlurMask = FocusBlurMask(centerLinearDepth);
+    bool isBackground = centerDepth >= 0.999999;
+    float centerBlurMask = isBackground ? 0.0 : FocusBlurMask(centerLinearDepth);
 
     if (uDebugView == 0)
     {

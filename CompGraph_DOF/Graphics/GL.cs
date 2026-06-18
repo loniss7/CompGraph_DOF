@@ -26,6 +26,7 @@ internal static class GL
 
     public const uint COLOR_BUFFER_BIT = 0x00004000;
     public const uint DEPTH_BUFFER_BIT = 0x00000100;
+    public const uint NO_ERROR = 0x0000;
 
     public const uint NONE = 0;
 
@@ -238,6 +239,9 @@ internal static class GL
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate IntPtr GlGetString(uint name);
 
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate uint GlGetError();
+
     public static GlViewport Viewport = null!;
     public static GlClearBufferfv ClearBufferfv = null!;
     public static GlClearBufferuiv ClearBufferuiv = null!;
@@ -294,4 +298,5 @@ internal static class GL
     public static GlDrawArrays DrawArrays = null!;
     public static GlDrawElements DrawElements = null!;
     public static GlGetString GetString = null!;
+    public static GlGetError GetError = null!;
 }

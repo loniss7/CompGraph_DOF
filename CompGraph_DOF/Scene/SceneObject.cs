@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using CompGraph_DOF.Graphics;
 
@@ -22,12 +23,15 @@ internal sealed class SceneObject
         BaseColor = baseColor;
         SpecularStrength = specularStrength;
         Shininess = shininess;
+
+        Debug.Assert(Model.GetDeterminant() > 0f);
     }
 
     public void Draw(ShaderProgram shader)
     {
-        // Keep the CPU-side model matrix in row-major form and upload the transposed copy for GLSL.
-        shader.SetMatrix4("uModel", Matrix4x4.Transpose(Model));
+        Debug.Assert(Model.GetDeterminant() > 0f);
+
+        shader.SetMatrix4("uModel", Model);
         shader.SetVector3("uBaseColor", BaseColor);
         shader.SetFloat("uSpecularStrength", SpecularStrength);
         shader.SetFloat("uShininess", Shininess);

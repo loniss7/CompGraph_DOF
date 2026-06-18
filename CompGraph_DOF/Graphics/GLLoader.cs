@@ -67,6 +67,7 @@ internal static class GLLoader
         GL.DrawArrays = Load<GL.GlDrawArrays>("glDrawArrays");
         GL.DrawElements = Load<GL.GlDrawElements>("glDrawElements");
         GL.GetString = Load<GL.GlGetString>("glGetString");
+        GL.GetError = Load<GL.GlGetError>("glGetError");
     }
 
     public static Wgl.WglCreateContextAttribsARB LoadCreateContextAttribs()

@@ -23,7 +23,7 @@ internal sealed class DofRenderer : IDisposable
     public float MaxBlurRadius { get; set; } = 8.0f;
     public float Sigma { get; set; } = 3.0f;
     public float DepthSigma { get; set; } = 2.0f;
-    public DofDebugView DebugView { get; set; } = DofDebugView.Composite;
+    public DofDebugView DebugView { get; set; } = DofDebugView.SceneColor;
 
     private static readonly Vector3 LightDirection = Vector3.Normalize(new Vector3(-0.45f, -1.0f, -0.35f));
     private static readonly float[] ClearColor = { 0.05f, 0.06f, 0.09f, 1f };
@@ -71,6 +71,7 @@ internal sealed class DofRenderer : IDisposable
         _dofFramebuffer?.Dispose();
         _sceneFramebuffer = new Framebuffer(width, height, FramebufferKind.Scene);
         _dofFramebuffer = new Framebuffer(width, height, FramebufferKind.Dof);
+        AssertNoGlError("Framebuffer creation");
     }
 
     public void ResetParameters(float defaultFocusDistance)
@@ -83,7 +84,7 @@ internal sealed class DofRenderer : IDisposable
         MaxBlurRadius = 8.0f;
         Sigma = 3.0f;
         DepthSigma = 2.0f;
-        DebugView = DofDebugView.Composite;
+        DebugView = DofDebugView.SceneColor;
     }
 
     public void Render(Camera camera, DemoScene scene)
@@ -94,6 +95,13 @@ internal sealed class DofRenderer : IDisposable
         }
 
         RenderScene(camera, scene);
+
+        if (DebugView == DofDebugView.SceneColor)
+        {
+            PresentSceneColor();
+            return;
+        }
+
         RenderDof(camera);
     }
 
@@ -128,6 +136,7 @@ internal sealed class DofRenderer : IDisposable
         if (id[0] == 0)
         {
             GL.BindFramebuffer(GL.READ_FRAMEBUFFER, 0);
+            AssertNoGlError("Picking");
             return false;
         }
 
@@ -147,11 +156,14 @@ internal sealed class DofRenderer : IDisposable
 
         if (depth[0] >= 1f)
         {
+            GL.BindFramebuffer(GL.READ_FRAMEBUFFER, 0);
+            AssertNoGlError("Picking");
             return false;
         }
 
         objectId = id[0];
         linearDepth = camera.LinearizeDepth(depth[0]);
+        AssertNoGlError("Picking");
         return true;
     }
 
@@ -179,9 +191,8 @@ internal sealed class DofRenderer : IDisposable
         GL.ClearBufferfv(GL.DEPTH, 0, ClearDepth);
 
         _sceneShader.Use();
-        // Camera matrices are built on the CPU in row-major form and transposed before upload.
-        _sceneShader.SetMatrix4("uView", Matrix4x4.Transpose(camera.GetViewMatrix()));
-        _sceneShader.SetMatrix4("uProjection", Matrix4x4.Transpose(camera.GetProjectionMatrix()));
+        _sceneShader.SetMatrix4("uView", camera.GetViewMatrix());
+        _sceneShader.SetMatrix4("uProjection", camera.GetProjectionMatrix());
         _sceneShader.SetVector3("uCameraPosition", camera.Position);
         _sceneShader.SetVector3("uLightDirection", LightDirection);
 
@@ -189,6 +200,18 @@ internal sealed class DofRenderer : IDisposable
         {
             sceneObject.Draw(_sceneShader);
         }
+
+        AssertNoGlError("Scene render");
+    }
+
+    private void PresentSceneColor()
+    {
+        _sceneFramebuffer!.Bind();
+        GL.ReadBuffer(GL.COLOR_ATTACHMENT0);
+        GL.BindFramebuffer(GL.DRAW_FRAMEBUFFER, 0);
+        GL.BlitFramebuffer(0, 0, _width, _height, 0, 0, _width, _height, GL.COLOR_BUFFER_BIT, GL.LINEAR);
+        GL.BindFramebuffer(GL.FRAMEBUFFER, 0);
+        AssertNoGlError("Framebuffer blit");
     }
 
     private void RenderDof(Camera camera)
@@ -220,10 +243,22 @@ internal sealed class DofRenderer : IDisposable
         GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer.DepthTexture);
 
         _fullscreenQuad.Draw();
+        AssertNoGlError("DOF render");
 
         GL.BindFramebuffer(GL.READ_FRAMEBUFFER, _dofFramebuffer.Handle);
+        GL.ReadBuffer(GL.COLOR_ATTACHMENT0);
         GL.BindFramebuffer(GL.DRAW_FRAMEBUFFER, 0);
         GL.BlitFramebuffer(0, 0, _width, _height, 0, 0, _width, _height, GL.COLOR_BUFFER_BIT, GL.LINEAR);
         GL.BindFramebuffer(GL.FRAMEBUFFER, 0);
+        AssertNoGlError("Framebuffer blit");
+    }
+
+    private static void AssertNoGlError(string stage)
+    {
+        uint error = GL.GetError();
+        if (error != GL.NO_ERROR)
+        {
+            throw new InvalidOperationException($"{stage} failed with OpenGL error 0x{error:X4}.");
+        }
     }
 }

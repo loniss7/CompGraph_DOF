@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 
 namespace CompGraph_DOF.Scene;
@@ -31,6 +32,8 @@ internal sealed class Camera
         Position = new Vector3(0f, 0f, 11.5f);
         Yaw = DefaultYaw;
         Pitch = DefaultPitch;
+
+        ValidateMatrixPipeline();
     }
 
     public void SetAspectRatio(float aspectRatio)
@@ -88,18 +91,10 @@ internal sealed class Camera
     public Matrix4x4 GetViewMatrix()
     {
         Vector3 forward = GetForwardVector();
-        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-        Vector3 up = Vector3.Normalize(Vector3.Cross(right, forward));
-
-        float tx = -Vector3.Dot(right, Position);
-        float ty = -Vector3.Dot(up, Position);
-        float tz = Vector3.Dot(forward, Position);
-
-        return new Matrix4x4(
-            right.X, right.Y, right.Z, tx,
-            up.X, up.Y, up.Z, ty,
-            -forward.X, -forward.Y, -forward.Z, tz,
-            0f, 0f, 0f, 1f);
+        return Matrix4x4.CreateLookAt(
+            Position,
+            Position + forward,
+            Vector3.UnitY);
     }
 
     public Matrix4x4 GetProjectionMatrix()
@@ -111,8 +106,8 @@ internal sealed class Camera
         return new Matrix4x4(
             f / AspectRatio, 0f, 0f, 0f,
             0f, f, 0f, 0f,
-            0f, 0f, (FarPlane + NearPlane) / range, (2f * FarPlane * NearPlane) / range,
-            0f, 0f, -1f, 0f);
+            0f, 0f, (FarPlane + NearPlane) / range, -1f,
+            0f, 0f, (2f * FarPlane * NearPlane) / range, 0f);
     }
 
     public float LinearizeDepth(float depth)
@@ -120,6 +115,37 @@ internal sealed class Camera
         float zNdc = depth * 2f - 1f;
         return (2f * NearPlane * FarPlane) /
                (FarPlane + NearPlane - zNdc * (FarPlane - NearPlane));
+    }
+
+    [Conditional("DEBUG")]
+    private void ValidateMatrixPipeline()
+    {
+        Matrix4x4 view = GetViewMatrix();
+        Matrix4x4 projection = GetProjectionMatrix();
+
+        Vector4 viewCenter = Vector4.Transform(new Vector4(0f, 0f, 0f, 1f), view);
+        Debug.Assert(float.IsFinite(viewCenter.X));
+        Debug.Assert(float.IsFinite(viewCenter.Y));
+        Debug.Assert(float.IsFinite(viewCenter.Z));
+        Debug.Assert(float.IsFinite(viewCenter.W));
+        Debug.Assert(viewCenter.Z < 0f);
+
+        Vector4 clipCenter = Vector4.Transform(viewCenter, projection);
+        Debug.Assert(float.IsFinite(clipCenter.X));
+        Debug.Assert(float.IsFinite(clipCenter.Y));
+        Debug.Assert(float.IsFinite(clipCenter.Z));
+        Debug.Assert(float.IsFinite(clipCenter.W));
+        Debug.Assert(clipCenter.W > 0f);
+
+        Vector4 nearClip = Vector4.Transform(new Vector4(0f, 0f, -NearPlane, 1f), projection);
+        Vector4 farClip = Vector4.Transform(new Vector4(0f, 0f, -FarPlane, 1f), projection);
+
+        float nearNdcZ = nearClip.Z / nearClip.W;
+        float farNdcZ = farClip.Z / farClip.W;
+
+        Debug.Assert(MathF.Abs(viewCenter.Z + 11.5f) < 0.01f);
+        Debug.Assert(MathF.Abs(nearNdcZ + 1f) < 0.01f);
+        Debug.Assert(MathF.Abs(farNdcZ - 1f) < 0.01f);
     }
 
     private static float DegreesToRadians(float degrees) => degrees * (MathF.PI / 180f);
