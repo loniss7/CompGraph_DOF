@@ -344,8 +344,9 @@ internal sealed class DofApplication : IDisposable
     {
         string title = string.Format(
             CultureInfo.InvariantCulture,
-            "CompGraph DOF | View {0} | Focus {1:F2} | Range {2:F2} | Transition {3:F2} | Radius {4:F1} | Sigma {5:F2} | Depth {6:F2} | {7} | {8}",
+            "CompGraph DOF | View {0} | Blur {1} | Focus {2:F2} | Range {3:F2} | Transition {4:F2} | Radius {5:F1} | Sigma {6:F2} | Depth {7:F2} | {8} | {9}",
             DescribeDebugView(_renderer.DebugView),
+            _renderer.BlurEnabled ? "On" : "Off",
             _renderer.FocusDistance,
             _renderer.FocusRange,
             _renderer.FocusTransition,
@@ -543,7 +544,7 @@ internal sealed class DofApplication : IDisposable
                 break;
 
             case Win32.VK_OEM_PLUS:
-                _renderer.MaxBlurRadius = MathF.Min(32.0f, _renderer.MaxBlurRadius + 1.0f);
+                _renderer.MaxBlurRadius = MathF.Min(48.0f, _renderer.MaxBlurRadius + 1.0f);
                 break;
 
             case Win32.VK_OEM_4:

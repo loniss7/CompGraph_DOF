@@ -17,16 +17,18 @@ internal sealed class DofRenderer : IDisposable
     private Framebuffer? _sceneFramebuffer;
     private Framebuffer? _blurPingFramebuffer;
     private Framebuffer? _blurPongFramebuffer;
+    private float _defaultFocusDistance;
     private int _width;
     private int _height;
 
     public float FocusDistance { get; set; }
+    public bool BlurEnabled { get; set; }
     public float FocusRange { get; set; } = 0.35f;
     public float FocusTransition { get; set; } = 0.90f;
-    public float NearBlurScale { get; set; } = 1.25f;
-    public float FarBlurScale { get; set; } = 1.25f;
-    public float MaxBlurRadius { get; set; } = 24.0f;
-    public float Sigma { get; set; } = 6.0f;
+    public float NearBlurScale { get; set; } = 1.35f;
+    public float FarBlurScale { get; set; } = 1.35f;
+    public float MaxBlurRadius { get; set; } = 32.0f;
+    public float Sigma { get; set; } = 7.0f;
     public float DepthSigma { get; set; } = 4.5f;
     public DofDebugView DebugView { get; set; } = DofDebugView.Composite;
 
@@ -55,6 +57,7 @@ internal sealed class DofRenderer : IDisposable
 
         _fullscreenQuad = new FullscreenQuad();
         _backgroundTexture = Texture2D.LoadFromFile(Path.Combine(AppContext.BaseDirectory, "Assets", "background.jpg"));
+        _defaultFocusDistance = initialFocusDistance;
         FocusDistance = initialFocusDistance;
         Resize(width, height);
 
@@ -64,12 +67,14 @@ internal sealed class DofRenderer : IDisposable
         _blurShader.Use();
         _blurShader.SetInt("uInputColor", 0);
         _blurShader.SetInt("uSceneDepth", 1);
+        _blurShader.SetInt("uBlurEnabled", 0);
 
         _compositeShader.Use();
         _compositeShader.SetInt("uSharpTexture", 0);
         _compositeShader.SetInt("uBlurredTexture", 1);
         _compositeShader.SetInt("uSceneDepth", 2);
         _compositeShader.SetInt("uSceneObjectIdTexture", 3);
+        _compositeShader.SetInt("uBlurEnabled", 0);
     }
 
     public void Resize(int width, int height)
@@ -99,13 +104,15 @@ internal sealed class DofRenderer : IDisposable
 
     public void ResetParameters(float defaultFocusDistance)
     {
+        _defaultFocusDistance = defaultFocusDistance;
         FocusDistance = defaultFocusDistance;
+        BlurEnabled = false;
         FocusRange = 0.35f;
         FocusTransition = 0.90f;
-        NearBlurScale = 1.25f;
-        FarBlurScale = 1.25f;
-        MaxBlurRadius = 24.0f;
-        Sigma = 6.0f;
+        NearBlurScale = 1.35f;
+        FarBlurScale = 1.35f;
+        MaxBlurRadius = 32.0f;
+        Sigma = 7.0f;
         DepthSigma = 4.5f;
         DebugView = DofDebugView.Composite;
     }
@@ -135,13 +142,19 @@ internal sealed class DofRenderer : IDisposable
             if (result.ObjectId != 0u)
             {
                 FocusDistance = result.LinearDepth;
+                BlurEnabled = true;
+            }
+            else
+            {
+                FocusDistance = _defaultFocusDistance;
+                BlurEnabled = false;
             }
         }
 
         switch (DebugView)
         {
             case DofDebugView.SceneColor:
-                PresentFramebuffer(_sceneFramebuffer);
+                RenderComposite(camera, DofDebugView.SceneColor);
                 return;
 
             case DofDebugView.Depth:
@@ -261,6 +274,8 @@ internal sealed class DofRenderer : IDisposable
         GL.ClearBufferfv(GL.COLOR, 0, ClearColor);
 
         _blurShader.Use();
+        _blurShader.SetInt("uDebugView", (int)DebugView);
+        _blurShader.SetInt("uBlurEnabled", BlurEnabled ? 1 : 0);
         _blurShader.SetFloat("uFocusDistance", FocusDistance);
         _blurShader.SetFloat("uFocusRange", FocusRange);
         _blurShader.SetFloat("uFocusTransition", FocusTransition);
@@ -293,6 +308,7 @@ internal sealed class DofRenderer : IDisposable
         GL.ClearBufferfv(GL.COLOR, 0, ClearColor);
 
         _compositeShader.Use();
+        _compositeShader.SetInt("uBlurEnabled", BlurEnabled ? 1 : 0);
         _compositeShader.SetFloat("uFocusDistance", FocusDistance);
         _compositeShader.SetFloat("uFocusRange", FocusRange);
         _compositeShader.SetFloat("uFocusTransition", FocusTransition);

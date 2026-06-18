@@ -21,3 +21,15 @@ C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\n
 C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Shaders\composite.frag
 C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Assets\background.jpg
 C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Shaders\background.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Assets\background.jpg
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\dof.vert
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\scene.vert
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\background.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\blur.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\composite.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\dof.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\Shaders\scene.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\CompGraph_DOF.deps.json
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\CompGraph_DOF.runtimeconfig.json
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\CompGraph_DOF.dll
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\_buildtemp\CompGraph_DOF.pdb

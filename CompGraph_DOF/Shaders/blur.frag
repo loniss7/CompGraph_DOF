@@ -15,6 +15,7 @@ uniform float uFarBlurScale;
 uniform float uMaxBlurRadius;
 uniform float uSigma;
 uniform float uDepthSigma;
+uniform int uBlurEnabled;
 uniform float uNearPlane;
 uniform float uFarPlane;
 
@@ -27,6 +28,11 @@ float LinearizeDepth(float depth, float nearPlane, float farPlane)
 
 float ComputeCoC(float linearDepth)
 {
+    if (uBlurEnabled == 0)
+    {
+        return 0.0;
+    }
+
     if (linearDepth >= uFarPlane * 0.99999)
     {
         return 1.0;

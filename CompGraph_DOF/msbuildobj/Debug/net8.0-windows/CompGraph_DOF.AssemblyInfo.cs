@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CompGraph_DOF")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e291635bff45a23ca7617e15a1ea15d8e294cb03")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5b8ea955fe99faeb9e4df71e3e8467da11925b87")]
 [assembly: System.Reflection.AssemblyProductAttribute("CompGraph_DOF")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CompGraph_DOF")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

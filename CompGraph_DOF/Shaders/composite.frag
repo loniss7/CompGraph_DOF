@@ -15,6 +15,7 @@ uniform float uFarBlurScale;
 uniform float uNearPlane;
 uniform float uFarPlane;
 uniform int uDebugView;
+uniform int uBlurEnabled;
 
 float LinearizeDepth(float depth, float nearPlane, float farPlane)
 {
@@ -25,6 +26,11 @@ float LinearizeDepth(float depth, float nearPlane, float farPlane)
 
 float ComputeCoC(float linearDepth)
 {
+    if (uBlurEnabled == 0)
+    {
+        return 0.0;
+    }
+
     if (linearDepth >= uFarPlane * 0.99999)
     {
         return 1.0;
@@ -109,9 +115,15 @@ void main()
         return;
     }
 
+    if (uDebugView == 0)
+    {
+        FragColor = vec4(ToneMap(sharpColor), 1.0);
+        return;
+    }
+
     vec3 blurredColor = texture(uBlurredTexture, vTexCoord).rgb;
 
-    if (uDebugView == 0 || uDebugView == 5)
+    if (uDebugView == 5)
     {
         vec3 result = mix(sharpColor, blurredColor, blurFactor);
         FragColor = vec4(ToneMap(result), 1.0);
