@@ -3,6 +3,7 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net8.0-windows</TargetFramework>
+        <UseWPF>true</UseWPF>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
@@ -10,6 +11,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Content Include="Assets\**\*.*" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="Shaders\**\*.vert" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="Shaders\**\*.frag" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>

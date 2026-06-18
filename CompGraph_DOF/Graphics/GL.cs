@@ -47,6 +47,7 @@ internal static class GL
     public const uint LINEAR = 0x2601;
     public const uint NEAREST = 0x2600;
     public const uint CLAMP_TO_EDGE = 0x812F;
+    public const uint BGRA = 0x80E1;
 
     public const uint FRAMEBUFFER = 0x8D40;
     public const uint READ_FRAMEBUFFER = 0x8CA8;

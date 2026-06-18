@@ -13,8 +13,19 @@ internal sealed class SceneObject
     public Vector3 BaseColor { get; }
     public float SpecularStrength { get; }
     public float Shininess { get; }
+    public Vector3 EmissionColor { get; }
+    public float EmissionStrength { get; }
 
-    public SceneObject(uint id, string name, Mesh mesh, Matrix4x4 model, Vector3 baseColor, float specularStrength, float shininess)
+    public SceneObject(
+        uint id,
+        string name,
+        Mesh mesh,
+        Matrix4x4 model,
+        Vector3 baseColor,
+        float specularStrength,
+        float shininess,
+        Vector3? emissionColor = null,
+        float emissionStrength = 0f)
     {
         Id = id;
         Name = name;
@@ -23,6 +34,8 @@ internal sealed class SceneObject
         BaseColor = baseColor;
         SpecularStrength = specularStrength;
         Shininess = shininess;
+        EmissionColor = emissionColor ?? Vector3.Zero;
+        EmissionStrength = emissionStrength;
 
         Debug.Assert(Model.GetDeterminant() > 0f);
     }
@@ -35,6 +48,8 @@ internal sealed class SceneObject
         shader.SetVector3("uBaseColor", BaseColor);
         shader.SetFloat("uSpecularStrength", SpecularStrength);
         shader.SetFloat("uShininess", Shininess);
+        shader.SetVector3("uEmissionColor", EmissionColor);
+        shader.SetFloat("uEmissionStrength", EmissionStrength);
         shader.SetUInt("uObjectId", Id);
         Mesh.Draw();
     }

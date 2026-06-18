@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+**/msbuildobj/
+.vs/
+*.user
+*.suo

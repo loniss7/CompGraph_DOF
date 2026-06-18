@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using CompGraph_DOF.Graphics;
 using CompGraph_DOF.Native;
@@ -36,6 +37,8 @@ internal sealed class DofApplication : IDisposable
     private int _clientHeight;
     private bool _exitRequested;
     private string _pickedLabel = "Background";
+    private string _pickDetails = "No pick";
+    private PickRequest? _pendingPick;
 
     public DofApplication()
     {
@@ -86,7 +89,18 @@ internal sealed class DofApplication : IDisposable
             if (_clientWidth > 0 && _clientHeight > 0)
             {
                 UpdateFrame(deltaTime);
-                _renderer.Render(_camera, _scene);
+                _renderer.Render(_camera, _scene, _clientWidth, _clientHeight, _pendingPick, out PickResult? pickResult);
+                _pendingPick = null;
+
+                if (pickResult.HasValue)
+                {
+                    UpdatePickState(pickResult.Value);
+
+                    if (pickResult.Value.ObjectId != 0u && _renderer.DebugView == DofDebugView.SceneColor)
+                    {
+                        _renderer.DebugView = DofDebugView.Composite;
+                    }
+                }
                 Win32.SwapBuffers(_deviceContext);
                 UpdateWindowTitle();
             }
@@ -316,38 +330,21 @@ internal sealed class DofApplication : IDisposable
         }
     }
 
-    private void PickFocusAt(int clientX, int clientY)
-    {
-        if (!_renderer.TryPick(clientX, clientY, _camera, out uint pickedObjectId, out float depthDistance))
-        {
-            _pickedLabel = "Background";
-            return;
-        }
-
-        _renderer.FocusDistance = depthDistance;
-
-        if (_scene.TryGetObject(pickedObjectId, out SceneObject? sceneObject) && sceneObject is not null)
-        {
-            _pickedLabel = $"{sceneObject.Name} #{pickedObjectId}";
-            return;
-        }
-
-        _pickedLabel = $"Object #{pickedObjectId}";
-    }
-
     private void ResetCameraAndDof()
     {
         _camera.Reset();
         _camera.SetAspectRatio(GetAspectRatio());
         _renderer.ResetParameters(_scene.DefaultFocusDistance);
         _pickedLabel = "Background";
+        _pickDetails = "No pick";
+        _pendingPick = null;
     }
 
     private void UpdateWindowTitle()
     {
         string title = string.Format(
             CultureInfo.InvariantCulture,
-            "CompGraph DOF | View {0} | Focus {1:F2} | Range {2:F2} | Transition {3:F2} | Radius {4:F1} | Sigma {5:F2} | Depth {6:F2} | {7}",
+            "CompGraph DOF | View {0} | Focus {1:F2} | Range {2:F2} | Transition {3:F2} | Radius {4:F1} | Sigma {5:F2} | Depth {6:F2} | {7} | {8}",
             DescribeDebugView(_renderer.DebugView),
             _renderer.FocusDistance,
             _renderer.FocusRange,
@@ -355,7 +352,8 @@ internal sealed class DofApplication : IDisposable
             _renderer.MaxBlurRadius,
             _renderer.Sigma,
             _renderer.DepthSigma,
-            _pickedLabel);
+            _pickedLabel,
+            _pickDetails);
 
         Win32.SetWindowText(_windowHandle, title);
     }
@@ -462,7 +460,7 @@ internal sealed class DofApplication : IDisposable
                 return HandleKeyUp((int)wParam);
 
             case Win32.WM_LBUTTONDOWN:
-                PickFocusAt(GetX(lParam), GetY(lParam));
+                _pendingPick = new PickRequest(GetX(lParam), GetY(lParam));
                 return 0;
 
             case Win32.WM_RBUTTONDOWN:
@@ -525,11 +523,43 @@ internal sealed class DofApplication : IDisposable
                 break;
 
             case Win32.VK_4:
-                _renderer.DebugView = DofDebugView.BlurredColor;
+                _renderer.DebugView = DofDebugView.HorizontalBlur;
                 break;
 
             case Win32.VK_5:
+                _renderer.DebugView = DofDebugView.VerticalBlur;
+                break;
+
+            case Win32.VK_6:
                 _renderer.DebugView = DofDebugView.Composite;
+                break;
+
+            case Win32.VK_7:
+                _renderer.DebugView = DofDebugView.ObjectId;
+                break;
+
+            case Win32.VK_OEM_MINUS:
+                _renderer.MaxBlurRadius = MathF.Max(0.5f, _renderer.MaxBlurRadius - 1.0f);
+                break;
+
+            case Win32.VK_OEM_PLUS:
+                _renderer.MaxBlurRadius = MathF.Min(32.0f, _renderer.MaxBlurRadius + 1.0f);
+                break;
+
+            case Win32.VK_OEM_4:
+                _renderer.FocusRange = MathF.Max(0.05f, _renderer.FocusRange - 0.05f);
+                break;
+
+            case Win32.VK_OEM_6:
+                _renderer.FocusRange = MathF.Min(10.0f, _renderer.FocusRange + 0.05f);
+                break;
+
+            case Win32.VK_OEM_1:
+                _renderer.FocusTransition = MathF.Max(0.05f, _renderer.FocusTransition - 0.05f);
+                break;
+
+            case Win32.VK_OEM_7:
+                _renderer.FocusTransition = MathF.Min(10.0f, _renderer.FocusTransition + 0.05f);
                 break;
         }
 
@@ -550,6 +580,31 @@ internal sealed class DofApplication : IDisposable
 
     private static int GetY(nint lParam) => unchecked((short)((lParam.ToInt64() >> 16) & 0xFFFF));
 
+    private void UpdatePickState(PickResult pickResult)
+    {
+        _pickDetails = string.Format(
+            CultureInfo.InvariantCulture,
+            "Raw {0:F4} | Linear {1:F2} | FB {2},{3}",
+            pickResult.RawDepth,
+            pickResult.LinearDepth,
+            pickResult.FramebufferX,
+            pickResult.FramebufferY);
+
+        if (pickResult.ObjectId == 0u)
+        {
+            _pickedLabel = "Background";
+            return;
+        }
+
+        if (_scene.TryGetObject(pickResult.ObjectId, out SceneObject? sceneObject) && sceneObject is not null)
+        {
+            _pickedLabel = $"{sceneObject.Name} #{pickResult.ObjectId}";
+            return;
+        }
+
+        _pickedLabel = $"Object #{pickResult.ObjectId}";
+    }
+
     private static string DescribeDebugView(DofDebugView debugView)
     {
         return debugView switch
@@ -557,8 +612,10 @@ internal sealed class DofApplication : IDisposable
             DofDebugView.SceneColor => "Scene",
             DofDebugView.Depth => "Depth",
             DofDebugView.CircleOfConfusion => "CoC",
-            DofDebugView.BlurredColor => "Blur",
+            DofDebugView.HorizontalBlur => "HBlur",
+            DofDebugView.VerticalBlur => "VBlur",
             DofDebugView.Composite => "Composite",
+            DofDebugView.ObjectId => "ObjectId",
             _ => "Unknown"
         };
     }

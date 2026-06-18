@@ -1,5 +1,6 @@
-using System.Runtime.InteropServices;
 using System.Numerics;
+using System.IO;
+using System.Runtime.InteropServices;
 using CompGraph_DOF.Graphics;
 using CompGraph_DOF.Scene;
 
@@ -8,22 +9,26 @@ namespace CompGraph_DOF.Rendering;
 internal sealed class DofRenderer : IDisposable
 {
     private readonly ShaderProgram _sceneShader;
-    private readonly ShaderProgram _dofShader;
+    private readonly ShaderProgram _backgroundShader;
+    private readonly ShaderProgram _blurShader;
+    private readonly ShaderProgram _compositeShader;
     private readonly FullscreenQuad _fullscreenQuad;
+    private readonly Texture2D _backgroundTexture;
     private Framebuffer? _sceneFramebuffer;
-    private Framebuffer? _dofFramebuffer;
+    private Framebuffer? _blurPingFramebuffer;
+    private Framebuffer? _blurPongFramebuffer;
     private int _width;
     private int _height;
 
     public float FocusDistance { get; set; }
-    public float FocusRange { get; set; } = 0.8f;
-    public float FocusTransition { get; set; } = 1.5f;
-    public float NearBlurScale { get; set; } = 1.0f;
-    public float FarBlurScale { get; set; } = 1.0f;
-    public float MaxBlurRadius { get; set; } = 8.0f;
-    public float Sigma { get; set; } = 3.0f;
-    public float DepthSigma { get; set; } = 2.0f;
-    public DofDebugView DebugView { get; set; } = DofDebugView.SceneColor;
+    public float FocusRange { get; set; } = 0.35f;
+    public float FocusTransition { get; set; } = 0.90f;
+    public float NearBlurScale { get; set; } = 1.25f;
+    public float FarBlurScale { get; set; } = 1.25f;
+    public float MaxBlurRadius { get; set; } = 24.0f;
+    public float Sigma { get; set; } = 6.0f;
+    public float DepthSigma { get; set; } = 4.5f;
+    public DofDebugView DebugView { get; set; } = DofDebugView.Composite;
 
     private static readonly Vector3 LightDirection = Vector3.Normalize(new Vector3(-0.45f, -1.0f, -0.35f));
     private static readonly float[] ClearColor = { 0.05f, 0.06f, 0.09f, 1f };
@@ -36,21 +41,35 @@ internal sealed class DofRenderer : IDisposable
             Path.Combine(shaderRootDirectory, "scene.vert"),
             Path.Combine(shaderRootDirectory, "scene.frag"));
 
-        _dofShader = new ShaderProgram(
+        _backgroundShader = new ShaderProgram(
             Path.Combine(shaderRootDirectory, "dof.vert"),
-            Path.Combine(shaderRootDirectory, "dof.frag"));
+            Path.Combine(shaderRootDirectory, "background.frag"));
+
+        _blurShader = new ShaderProgram(
+            Path.Combine(shaderRootDirectory, "dof.vert"),
+            Path.Combine(shaderRootDirectory, "blur.frag"));
+
+        _compositeShader = new ShaderProgram(
+            Path.Combine(shaderRootDirectory, "dof.vert"),
+            Path.Combine(shaderRootDirectory, "composite.frag"));
 
         _fullscreenQuad = new FullscreenQuad();
+        _backgroundTexture = Texture2D.LoadFromFile(Path.Combine(AppContext.BaseDirectory, "Assets", "background.jpg"));
         FocusDistance = initialFocusDistance;
         Resize(width, height);
 
-        _sceneShader.Use();
-        _sceneShader.SetInt("uSceneColorTexture", 0);
-        _sceneShader.SetInt("uSceneDepthTexture", 1);
+        _backgroundShader.Use();
+        _backgroundShader.SetInt("uBackgroundTexture", 0);
 
-        _dofShader.Use();
-        _dofShader.SetInt("uSceneColorTexture", 0);
-        _dofShader.SetInt("uSceneDepthTexture", 1);
+        _blurShader.Use();
+        _blurShader.SetInt("uInputColor", 0);
+        _blurShader.SetInt("uSceneDepth", 1);
+
+        _compositeShader.Use();
+        _compositeShader.SetInt("uSharpTexture", 0);
+        _compositeShader.SetInt("uBlurredTexture", 1);
+        _compositeShader.SetInt("uSceneDepth", 2);
+        _compositeShader.SetInt("uSceneObjectIdTexture", 3);
     }
 
     public void Resize(int width, int height)
@@ -61,119 +80,107 @@ internal sealed class DofRenderer : IDisposable
         if (width <= 0 || height <= 0)
         {
             _sceneFramebuffer?.Dispose();
-            _dofFramebuffer?.Dispose();
+            _blurPingFramebuffer?.Dispose();
+            _blurPongFramebuffer?.Dispose();
             _sceneFramebuffer = null;
-            _dofFramebuffer = null;
+            _blurPingFramebuffer = null;
+            _blurPongFramebuffer = null;
             return;
         }
 
         _sceneFramebuffer?.Dispose();
-        _dofFramebuffer?.Dispose();
+        _blurPingFramebuffer?.Dispose();
+        _blurPongFramebuffer?.Dispose();
         _sceneFramebuffer = new Framebuffer(width, height, FramebufferKind.Scene);
-        _dofFramebuffer = new Framebuffer(width, height, FramebufferKind.Dof);
+        _blurPingFramebuffer = new Framebuffer(width, height, FramebufferKind.Blur);
+        _blurPongFramebuffer = new Framebuffer(width, height, FramebufferKind.Blur);
         AssertNoGlError("Framebuffer creation");
     }
 
     public void ResetParameters(float defaultFocusDistance)
     {
         FocusDistance = defaultFocusDistance;
-        FocusRange = 0.8f;
-        FocusTransition = 1.5f;
-        NearBlurScale = 1.0f;
-        FarBlurScale = 1.0f;
-        MaxBlurRadius = 8.0f;
-        Sigma = 3.0f;
-        DepthSigma = 2.0f;
-        DebugView = DofDebugView.SceneColor;
+        FocusRange = 0.35f;
+        FocusTransition = 0.90f;
+        NearBlurScale = 1.25f;
+        FarBlurScale = 1.25f;
+        MaxBlurRadius = 24.0f;
+        Sigma = 6.0f;
+        DepthSigma = 4.5f;
+        DebugView = DofDebugView.Composite;
     }
 
-    public void Render(Camera camera, DemoScene scene)
+    public void Render(
+        Camera camera,
+        DemoScene scene,
+        int clientWidth,
+        int clientHeight,
+        PickRequest? pendingPick,
+        out PickResult? pickResult)
     {
-        if (_sceneFramebuffer is null || _dofFramebuffer is null || _width <= 0 || _height <= 0)
+        pickResult = null;
+
+        if (_sceneFramebuffer is null || _blurPingFramebuffer is null || _blurPongFramebuffer is null || _width <= 0 || _height <= 0)
         {
             return;
         }
 
         RenderScene(camera, scene);
 
-        if (DebugView == DofDebugView.SceneColor)
+        if (pendingPick.HasValue)
         {
-            PresentSceneColor();
-            return;
+            TryPick(pendingPick.Value, clientWidth, clientHeight, camera, out PickResult result);
+            pickResult = result;
+
+            if (result.ObjectId != 0u)
+            {
+                FocusDistance = result.LinearDepth;
+            }
         }
 
-        RenderDof(camera);
-    }
-
-    public bool TryPick(int x, int y, Camera camera, out uint objectId, out float linearDepth)
-    {
-        objectId = 0;
-        linearDepth = 0f;
-
-        if (_sceneFramebuffer is null || _width <= 0 || _height <= 0)
+        switch (DebugView)
         {
-            return false;
+            case DofDebugView.SceneColor:
+                PresentFramebuffer(_sceneFramebuffer);
+                return;
+
+            case DofDebugView.Depth:
+            case DofDebugView.CircleOfConfusion:
+            case DofDebugView.ObjectId:
+                RenderComposite(camera, DebugView);
+                return;
+
+            case DofDebugView.HorizontalBlur:
+                RenderHorizontalBlur(camera);
+                PresentFramebuffer(_blurPingFramebuffer);
+                return;
+
+            case DofDebugView.VerticalBlur:
+                RenderHorizontalBlur(camera);
+                RenderVerticalBlur(camera);
+                PresentFramebuffer(_blurPongFramebuffer);
+                return;
+
+            case DofDebugView.Composite:
+            default:
+                RenderHorizontalBlur(camera);
+                RenderVerticalBlur(camera);
+                RenderComposite(camera, DofDebugView.Composite);
+                return;
         }
-
-        int clampedX = Math.Clamp(x, 0, _width - 1);
-        int clampedY = Math.Clamp(y, 0, _height - 1);
-        int flippedY = _height - 1 - clampedY;
-
-        GL.BindFramebuffer(GL.READ_FRAMEBUFFER, _sceneFramebuffer.Handle);
-
-        GL.ReadBuffer(GL.COLOR_ATTACHMENT1);
-        uint[] id = new uint[1];
-        GCHandle idHandle = GCHandle.Alloc(id, GCHandleType.Pinned);
-        try
-        {
-            GL.ReadPixels(clampedX, flippedY, 1, 1, GL.RED_INTEGER, GL.UNSIGNED_INT, idHandle.AddrOfPinnedObject());
-        }
-        finally
-        {
-            idHandle.Free();
-        }
-
-        if (id[0] == 0)
-        {
-            GL.BindFramebuffer(GL.READ_FRAMEBUFFER, 0);
-            AssertNoGlError("Picking");
-            return false;
-        }
-
-        GL.ReadBuffer(GL.NONE);
-        float[] depth = new float[1];
-        GCHandle depthHandle = GCHandle.Alloc(depth, GCHandleType.Pinned);
-        try
-        {
-            GL.ReadPixels(clampedX, flippedY, 1, 1, GL.DEPTH_COMPONENT, GL.FLOAT, depthHandle.AddrOfPinnedObject());
-        }
-        finally
-        {
-            depthHandle.Free();
-        }
-
-        GL.BindFramebuffer(GL.READ_FRAMEBUFFER, 0);
-
-        if (depth[0] >= 1f)
-        {
-            GL.BindFramebuffer(GL.READ_FRAMEBUFFER, 0);
-            AssertNoGlError("Picking");
-            return false;
-        }
-
-        objectId = id[0];
-        linearDepth = camera.LinearizeDepth(depth[0]);
-        AssertNoGlError("Picking");
-        return true;
     }
 
     public void Dispose()
     {
         _sceneFramebuffer?.Dispose();
-        _dofFramebuffer?.Dispose();
+        _blurPingFramebuffer?.Dispose();
+        _blurPongFramebuffer?.Dispose();
         _fullscreenQuad.Dispose();
         _sceneShader.Dispose();
-        _dofShader.Dispose();
+        _backgroundShader.Dispose();
+        _blurShader.Dispose();
+        _compositeShader.Dispose();
+        _backgroundTexture.Dispose();
     }
 
     private void RenderScene(Camera camera, DemoScene scene)
@@ -190,6 +197,8 @@ internal sealed class DofRenderer : IDisposable
         GL.ClearBufferuiv(GL.COLOR, 1, ClearObjectId);
         GL.ClearBufferfv(GL.DEPTH, 0, ClearDepth);
 
+        RenderBackground();
+
         _sceneShader.Use();
         _sceneShader.SetMatrix4("uView", camera.GetViewMatrix());
         _sceneShader.SetMatrix4("uProjection", camera.GetProjectionMatrix());
@@ -204,9 +213,111 @@ internal sealed class DofRenderer : IDisposable
         AssertNoGlError("Scene render");
     }
 
-    private void PresentSceneColor()
+    private void RenderBackground()
     {
-        _sceneFramebuffer!.Bind();
+        GL.Disable(GL.DEPTH_TEST);
+        GL.Disable(GL.CULL_FACE);
+
+        _backgroundShader.Use();
+        _backgroundTexture.Bind();
+        _fullscreenQuad.Draw();
+
+        GL.Enable(GL.DEPTH_TEST);
+        GL.Enable(GL.CULL_FACE);
+    }
+
+    private void RenderHorizontalBlur(Camera camera)
+    {
+        RenderBlurPass(
+            _blurPingFramebuffer!,
+            _sceneFramebuffer!.ColorTexture,
+            new Vector2(1f, 0f),
+            camera,
+            "Horizontal blur");
+    }
+
+    private void RenderVerticalBlur(Camera camera)
+    {
+        RenderBlurPass(
+            _blurPongFramebuffer!,
+            _blurPingFramebuffer!.ColorTexture,
+            new Vector2(0f, 1f),
+            camera,
+            "Vertical blur");
+    }
+
+    private void RenderBlurPass(
+        Framebuffer target,
+        uint inputColorTexture,
+        Vector2 direction,
+        Camera camera,
+        string stageName)
+    {
+        target.Bind();
+        GL.Viewport(0, 0, _width, _height);
+        GL.Disable(GL.DEPTH_TEST);
+        GL.Disable(GL.CULL_FACE);
+
+        GL.ClearBufferfv(GL.COLOR, 0, ClearColor);
+
+        _blurShader.Use();
+        _blurShader.SetFloat("uFocusDistance", FocusDistance);
+        _blurShader.SetFloat("uFocusRange", FocusRange);
+        _blurShader.SetFloat("uFocusTransition", FocusTransition);
+        _blurShader.SetFloat("uNearBlurScale", NearBlurScale);
+        _blurShader.SetFloat("uFarBlurScale", FarBlurScale);
+        _blurShader.SetFloat("uMaxBlurRadius", MaxBlurRadius);
+        _blurShader.SetFloat("uSigma", Sigma);
+        _blurShader.SetFloat("uDepthSigma", DepthSigma);
+        _blurShader.SetFloat("uNearPlane", camera.NearPlane);
+        _blurShader.SetFloat("uFarPlane", camera.FarPlane);
+        _blurShader.SetVector2("uTexelSize", new Vector2(1f / _width, 1f / _height));
+        _blurShader.SetVector2("uDirection", direction);
+
+        GL.ActiveTexture(GL.TEXTURE0);
+        GL.BindTexture(GL.TEXTURE_2D, inputColorTexture);
+        GL.ActiveTexture(GL.TEXTURE0 + 1);
+        GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer!.DepthTexture);
+
+        _fullscreenQuad.Draw();
+        AssertNoGlError(stageName);
+    }
+
+    private void RenderComposite(Camera camera, DofDebugView debugView)
+    {
+        GL.BindFramebuffer(GL.FRAMEBUFFER, 0);
+        GL.Viewport(0, 0, _width, _height);
+        GL.Disable(GL.DEPTH_TEST);
+        GL.Disable(GL.CULL_FACE);
+
+        GL.ClearBufferfv(GL.COLOR, 0, ClearColor);
+
+        _compositeShader.Use();
+        _compositeShader.SetFloat("uFocusDistance", FocusDistance);
+        _compositeShader.SetFloat("uFocusRange", FocusRange);
+        _compositeShader.SetFloat("uFocusTransition", FocusTransition);
+        _compositeShader.SetFloat("uNearBlurScale", NearBlurScale);
+        _compositeShader.SetFloat("uFarBlurScale", FarBlurScale);
+        _compositeShader.SetFloat("uNearPlane", camera.NearPlane);
+        _compositeShader.SetFloat("uFarPlane", camera.FarPlane);
+        _compositeShader.SetInt("uDebugView", (int)debugView);
+
+        GL.ActiveTexture(GL.TEXTURE0);
+        GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer!.ColorTexture);
+        GL.ActiveTexture(GL.TEXTURE0 + 1);
+        GL.BindTexture(GL.TEXTURE_2D, _blurPongFramebuffer?.ColorTexture ?? _sceneFramebuffer.ColorTexture);
+        GL.ActiveTexture(GL.TEXTURE0 + 2);
+        GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer.DepthTexture);
+        GL.ActiveTexture(GL.TEXTURE0 + 3);
+        GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer.ObjectIdTexture);
+
+        _fullscreenQuad.Draw();
+        AssertNoGlError("Composite");
+    }
+
+    private void PresentFramebuffer(Framebuffer source)
+    {
+        GL.BindFramebuffer(GL.READ_FRAMEBUFFER, source.Handle);
         GL.ReadBuffer(GL.COLOR_ATTACHMENT0);
         GL.BindFramebuffer(GL.DRAW_FRAMEBUFFER, 0);
         GL.BlitFramebuffer(0, 0, _width, _height, 0, 0, _width, _height, GL.COLOR_BUFFER_BIT, GL.LINEAR);
@@ -214,43 +325,60 @@ internal sealed class DofRenderer : IDisposable
         AssertNoGlError("Framebuffer blit");
     }
 
-    private void RenderDof(Camera camera)
+    private bool TryPick(
+        PickRequest request,
+        int clientWidth,
+        int clientHeight,
+        Camera camera,
+        out PickResult pickResult)
     {
-        _dofFramebuffer!.Bind();
-        GL.Viewport(0, 0, _width, _height);
-        GL.Disable(GL.DEPTH_TEST);
-        GL.Disable(GL.CULL_FACE);
+        pickResult = default;
 
-        GL.ClearBufferfv(GL.COLOR, 0, new[] { 0f, 0f, 0f, 1f });
+        if (_sceneFramebuffer is null || _width <= 0 || _height <= 0 || clientWidth <= 0 || clientHeight <= 0)
+        {
+            return false;
+        }
 
-        _dofShader.Use();
-        _dofShader.SetFloat("uFocusDistance", FocusDistance);
-        _dofShader.SetFloat("uFocusRange", FocusRange);
-        _dofShader.SetFloat("uFocusTransition", FocusTransition);
-        _dofShader.SetFloat("uNearBlurScale", NearBlurScale);
-        _dofShader.SetFloat("uFarBlurScale", FarBlurScale);
-        _dofShader.SetFloat("uMaxBlurRadius", MaxBlurRadius);
-        _dofShader.SetFloat("uSigma", Sigma);
-        _dofShader.SetFloat("uDepthSigma", DepthSigma);
-        _dofShader.SetFloat("uNearPlane", camera.NearPlane);
-        _dofShader.SetFloat("uFarPlane", camera.FarPlane);
-        _dofShader.SetVector2("uTexelSize", new Vector2(1f / _width, 1f / _height));
-        _dofShader.SetInt("uDebugView", (int)DebugView);
+        int clampedClientX = Math.Clamp(request.ClientX, 0, clientWidth - 1);
+        int clampedClientY = Math.Clamp(request.ClientY, 0, clientHeight - 1);
+        int framebufferX = Math.Clamp((int)MathF.Floor(clampedClientX * _width / (float)clientWidth), 0, _width - 1);
+        int framebufferYTop = Math.Clamp((int)MathF.Floor(clampedClientY * _height / (float)clientHeight), 0, _height - 1);
+        int framebufferY = _height - 1 - framebufferYTop;
 
-        GL.ActiveTexture(GL.TEXTURE0);
-        GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer!.ColorTexture);
-        GL.ActiveTexture(GL.TEXTURE0 + 1);
-        GL.BindTexture(GL.TEXTURE_2D, _sceneFramebuffer.DepthTexture);
+        GL.BindFramebuffer(GL.READ_FRAMEBUFFER, _sceneFramebuffer.Handle);
 
-        _fullscreenQuad.Draw();
-        AssertNoGlError("DOF render");
+        GL.ReadBuffer(GL.COLOR_ATTACHMENT1);
+        uint[] objectId = new uint[1];
+        GCHandle objectIdHandle = GCHandle.Alloc(objectId, GCHandleType.Pinned);
+        try
+        {
+            GL.ReadPixels(framebufferX, framebufferY, 1, 1, GL.RED_INTEGER, GL.UNSIGNED_INT, objectIdHandle.AddrOfPinnedObject());
+        }
+        finally
+        {
+            objectIdHandle.Free();
+        }
 
-        GL.BindFramebuffer(GL.READ_FRAMEBUFFER, _dofFramebuffer.Handle);
-        GL.ReadBuffer(GL.COLOR_ATTACHMENT0);
-        GL.BindFramebuffer(GL.DRAW_FRAMEBUFFER, 0);
-        GL.BlitFramebuffer(0, 0, _width, _height, 0, 0, _width, _height, GL.COLOR_BUFFER_BIT, GL.LINEAR);
-        GL.BindFramebuffer(GL.FRAMEBUFFER, 0);
-        AssertNoGlError("Framebuffer blit");
+        GL.ReadBuffer(GL.NONE);
+        float[] depth = new float[1];
+        GCHandle depthHandle = GCHandle.Alloc(depth, GCHandleType.Pinned);
+        try
+        {
+            GL.ReadPixels(framebufferX, framebufferY, 1, 1, GL.DEPTH_COMPONENT, GL.FLOAT, depthHandle.AddrOfPinnedObject());
+        }
+        finally
+        {
+            depthHandle.Free();
+        }
+
+        GL.BindFramebuffer(GL.READ_FRAMEBUFFER, 0);
+
+        float linearDepth = camera.LinearizeDepth(depth[0]);
+        pickResult = new PickResult(objectId[0], depth[0], linearDepth, framebufferX, framebufferY);
+
+        bool hit = objectId[0] != 0u && depth[0] < 1f;
+        AssertNoGlError("Picking");
+        return hit;
     }
 
     private static void AssertNoGlError(string stage)

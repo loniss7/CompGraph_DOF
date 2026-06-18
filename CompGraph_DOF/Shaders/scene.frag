@@ -11,6 +11,8 @@ uniform vec3 uLightDirection;
 uniform vec3 uBaseColor;
 uniform float uSpecularStrength;
 uniform float uShininess;
+uniform vec3 uEmissionColor;
+uniform float uEmissionStrength;
 uniform uint uObjectId;
 
 void main()
@@ -25,6 +27,7 @@ void main()
 
     vec3 ambient = uBaseColor * 0.16;
     vec3 litColor = ambient + uBaseColor * diffuse * 0.90 + vec3(specular * uSpecularStrength);
+    litColor += uEmissionColor * uEmissionStrength;
 
     FragColor = vec4(litColor, 1.0);
     FragObjectId = uObjectId;

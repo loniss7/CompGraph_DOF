@@ -3,7 +3,7 @@ namespace CompGraph_DOF.Graphics;
 internal enum FramebufferKind
 {
     Scene,
-    Dof
+    Blur
 }
 
 internal sealed class Framebuffer : IDisposable
@@ -81,7 +81,7 @@ internal sealed class Framebuffer : IDisposable
         GL.GenTextures(1, out uint texture);
         GL.BindTexture(GL.TEXTURE_2D, texture);
         SetTextureParameters(GL.LINEAR);
-        GL.TexImage2D(GL.TEXTURE_2D, 0, (int)GL.RGBA8, width, height, 0, GL.RGBA, GL.UNSIGNED_BYTE, IntPtr.Zero);
+        GL.TexImage2D(GL.TEXTURE_2D, 0, (int)GL.RGBA16F, width, height, 0, GL.RGBA, GL.FLOAT, IntPtr.Zero);
         return texture;
     }
 

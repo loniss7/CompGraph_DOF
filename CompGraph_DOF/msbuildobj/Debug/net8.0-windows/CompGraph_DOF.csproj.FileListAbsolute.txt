@@ -17,3 +17,7 @@ C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\msbuildobj\
 C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\msbuildobj\Debug\net8.0-windows\CompGraph_DOF.pdb
 C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\msbuildobj\Debug\net8.0-windows\CompGraph_DOF.genruntimeconfig.cache
 C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\msbuildobj\Debug\net8.0-windows\ref\CompGraph_DOF.dll
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Shaders\blur.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Shaders\composite.frag
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Assets\background.jpg
+C:\Users\sassy\Documents\study\CompGraph\CompGraph_DOF\CompGraph_DOF\bin\Debug\net8.0-windows\Shaders\background.frag

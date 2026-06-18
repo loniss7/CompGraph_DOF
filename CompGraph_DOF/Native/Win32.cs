@@ -52,6 +52,8 @@ internal static class Win32
     public const int VK_3 = 0x33;
     public const int VK_4 = 0x34;
     public const int VK_5 = 0x35;
+    public const int VK_6 = 0x36;
+    public const int VK_7 = 0x37;
     public const int VK_W = 0x57;
     public const int VK_A = 0x41;
     public const int VK_S = 0x53;
@@ -60,6 +62,10 @@ internal static class Win32
     public const int VK_E = 0x45;
     public const int VK_OEM_PLUS = 0xBB;
     public const int VK_OEM_MINUS = 0xBD;
+    public const int VK_OEM_4 = 0xDB;
+    public const int VK_OEM_6 = 0xDD;
+    public const int VK_OEM_1 = 0xBA;
+    public const int VK_OEM_7 = 0xDE;
 
     public const int IDC_ARROW = 32512;
 
